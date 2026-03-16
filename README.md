@@ -1,4 +1,4 @@
-# ANPR Traffic Violation Detection System
+# Smart Traffic Violation Detection System
 
 An end-to-end **Automatic Number Plate Recognition (ANPR)** system that detects vehicle license plates from images, extracts plate text using OCR, applies traffic violation rules, logs events into a database, and automatically sends fine notification emails.
 
