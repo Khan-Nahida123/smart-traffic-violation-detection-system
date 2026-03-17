@@ -1,23 +1,25 @@
 """
 gemini_client.py
 ----------------
-Gemini (Google GenAI) helper for drafting a fine-notice email.
+Gemini (Google GenAI) helper for drafting a traffic violation email notice.
 
-Important:
-- Uses the NEW official SDK: `google-genai`
-- Reads GEMINI_API_KEY from .env
+Uses:
+- Google Gemini API
+- Professional government-style email format
+- Safe fallback if Gemini fails
 
-Behavior:
-- If key missing / API fails, returns a safe fallback draft.
+Environment variable required:
+GEMINI_API_KEY
 """
 
 from __future__ import annotations
 
 import os
 from typing import Any, Dict
+from datetime import datetime
 
 try:
-    # NEW SDK (recommended by Google)
+    # Google official SDK
     from google import genai
 except Exception:
     genai = None
@@ -27,15 +29,24 @@ except Exception:
 # Fallback draft (used if Gemini fails / not configured)
 # ------------------------------------------------------------
 def _fallback_draft(owner_name: str, plate: str, violation: str, fine_amount: int) -> str:
+
+    current_time = datetime.now().strftime("%d %B %Y, %H:%M")
+    location = "Automated Traffic Monitoring Zone"
+
     return (
+        f"Subject: Traffic Violation Notice – {plate}\n\n"
         f"Dear {owner_name},\n\n"
-        f"This is a notice regarding a traffic violation detected for your vehicle.\n\n"
-        f"Plate Number: {plate}\n"
-        f"Violation: {violation}\n"
-        f"Fine Amount: INR {fine_amount}\n\n"
-        f"Please pay the fine as per applicable rules.\n\n"
+        f"A traffic violation has been detected by the Automated Number Plate "
+        f"Recognition (ANPR) monitoring system.\n\n"
+        f"Vehicle Number : {plate}\n"
+        f"Violation Type : {violation}\n"
+        f"Fine Amount    : INR {fine_amount}\n"
+        f"Date & Time    : {current_time}\n"
+        f"Location       : {location}\n\n"
+        f"Please ensure compliance with traffic regulations and clear the "
+        f"applicable fine as per traffic authority guidelines.\n\n"
         f"Regards,\n"
-        f"ANPR Demo System\n"
+        f"Traffic Monitoring Authority\n"
     )
 
 
@@ -49,49 +60,54 @@ def draft_fine_email_with_gemini(
     fine_amount: int
 ) -> Dict[str, Any]:
     """
+    Generate a traffic violation notice using Gemini.
+
     Returns:
-      {
-        "ok": True/False,
-        "draft": "...",
-        "mode": "gemini" or "fallback",
-        "error": "..." or ""
-      }
+    {
+      "ok": True/False,
+      "draft": "...",
+      "mode": "gemini" or "fallback",
+      "error": "..." or ""
+    }
     """
+
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
-    # If SDK missing or key missing -> fallback
     if (genai is None) or (not api_key):
         return {
             "ok": False,
             "draft": _fallback_draft(owner_name, plate, violation, fine_amount),
             "mode": "fallback",
-            "error": "Gemini not configured (missing google-genai or GEMINI_API_KEY)."
+            "error": "Gemini not configured."
         }
 
     try:
         client = genai.Client(api_key=api_key)
 
-        prompt = (
-            "You are drafting a professional traffic fine notice email.\n"
-            "Write a short, clear email in English with:\n"
-            "- Greeting using the owner's name\n"
-            "- Plate number\n"
-            "- Violation type\n"
-            "- Fine amount in INR\n"
-            "- One simple payment instruction line\n"
-            "- Polite closing\n\n"
-            "Rules:\n"
-            "- Do NOT include threats.\n"
-            "- Do NOT invent payment links.\n"
-            "- Keep it concise.\n\n"
-            f"Owner Name: {owner_name}\n"
-            f"Plate Number: {plate}\n"
-            f"Violation: {violation}\n"
-            f"Fine Amount (INR): {fine_amount}\n"
-        )
+        current_time = datetime.now().strftime("%d %B %Y, %H:%M")
+        location = "Automated Traffic Monitoring Zone"
 
-        # ✅ Model name for new SDK (works widely)
-        # If you want, later you can switch to another available model.
+        prompt = f"""
+You are drafting a professional traffic violation notice email from a traffic monitoring authority.
+
+Write a short and clear formal notice.
+
+Include the following information clearly:
+
+Owner Name: {owner_name}
+Vehicle Number: {plate}
+Violation Type: {violation}
+Fine Amount: INR {fine_amount}
+Date & Time: {current_time}
+Location: {location}
+
+Rules:
+- Use a professional government notice tone
+- Keep the message concise
+- Do not invent payment links
+- Do not add unnecessary explanations
+"""
+
         resp = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
@@ -107,7 +123,12 @@ def draft_fine_email_with_gemini(
                 "error": "Gemini returned empty text."
             }
 
-        return {"ok": True, "draft": draft, "mode": "gemini", "error": ""}
+        return {
+            "ok": True,
+            "draft": draft,
+            "mode": "gemini",
+            "error": ""
+        }
 
     except Exception as e:
         return {
@@ -116,4 +137,3 @@ def draft_fine_email_with_gemini(
             "mode": "fallback",
             "error": str(e)
         }
-
